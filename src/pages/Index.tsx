@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { RotateCcw } from "lucide-react";
+import { RotateCcw, Plus } from "lucide-react";
 import { Quality } from "@/lib/sm2";
 import { useSpacedRepetition, CardWithState } from "@/hooks/useSpacedRepetition";
 import Header from "@/components/Header";
@@ -11,10 +11,18 @@ import StudyStats from "@/components/StudyStats";
 import StudyModeSelector, { StudyMode } from "@/components/StudyModeSelector";
 import CardInfo from "@/components/CardInfo";
 import EmptyState from "@/components/EmptyState";
+import DeckSelector from "@/components/DeckSelector";
+import ImportDeckModal from "@/components/ImportDeckModal";
+import CreateDeckModal from "@/components/CreateDeckModal";
+import AddWordModal from "@/components/AddWordModal";
 
 const Index = () => {
   const {
     isLoaded,
+    activeDeck,
+    decks,
+    switchDeck,
+    refreshDecks,
     reviewCard,
     getDueCards,
     getNewCards,
@@ -29,10 +37,15 @@ const Index = () => {
   const [isFlipped, setIsFlipped] = useState(false);
   const [sessionReviewed, setSessionReviewed] = useState(0);
 
+  // Modal states
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showAddWordModal, setShowAddWordModal] = useState(false);
+
   // Get cards based on study mode
   const cards = useMemo((): CardWithState[] => {
     if (!isLoaded) return [];
-    
+
     switch (studyMode) {
       case "due":
         return getDueCards();
@@ -89,13 +102,12 @@ const Index = () => {
       if (!currentCard) return;
       reviewCard(currentCard.id, quality);
       setSessionReviewed((prev) => prev + 1);
-      
+
       // Move to next card or reset
       if (currentIndex < cards.length - 1) {
         goToNextCard();
       } else {
         setIsFlipped(false);
-        // The cards list will update due to state change
         setTimeout(() => {
           setCurrentIndex(0);
         }, 200);
@@ -118,12 +130,14 @@ const Index = () => {
   }, [goToNextCard]);
 
   const handleShuffle = useCallback(() => {
-    setCurrentIndex(Math.floor(Math.random() * cards.length));
-    setIsFlipped(false);
+    if (cards.length > 0) {
+      setCurrentIndex(Math.floor(Math.random() * cards.length));
+      setIsFlipped(false);
+    }
   }, [cards.length]);
 
   const handleResetProgress = useCallback(() => {
-    if (window.confirm("Are you sure you want to reset all progress? This cannot be undone.")) {
+    if (window.confirm("Are you sure you want to reset all progress for this deck? This cannot be undone.")) {
       resetProgress();
       setSessionReviewed(0);
       setCurrentIndex(0);
@@ -131,10 +145,29 @@ const Index = () => {
     }
   }, [resetProgress]);
 
+  const handleDeckChange = useCallback((deckId: string) => {
+    switchDeck(deckId);
+    setCurrentIndex(0);
+    setIsFlipped(false);
+    setSessionReviewed(0);
+  }, [switchDeck]);
+
+  const handleDeckCreated = useCallback((deckId: string) => {
+    refreshDecks();
+    switchDeck(deckId);
+    setCurrentIndex(0);
+    setIsFlipped(false);
+  }, [refreshDecks, switchDeck]);
+
+  const handleWordAdded = useCallback(() => {
+    refreshDecks();
+  }, [refreshDecks]);
+
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!currentCard) return;
+      if (showImportModal || showCreateModal || showAddWordModal) return;
 
       switch (e.key) {
         case " ":
@@ -168,9 +201,9 @@ const Index = () => {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentCard, isFlipped, handleFlip, handlePrevious, handleNext, handleRate]);
+  }, [currentCard, isFlipped, handleFlip, handlePrevious, handleNext, handleRate, showImportModal, showCreateModal, showAddWordModal]);
 
-  if (!isLoaded) {
+  if (!isLoaded || !activeDeck) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-pulse text-muted-foreground">Loading...</div>
@@ -183,6 +216,28 @@ const Index = () => {
       <Header />
 
       <main className="flex-1 flex flex-col items-center px-4 pb-12">
+        {/* Deck Selector */}
+        <div className="w-full max-w-2xl flex items-center justify-between gap-4 mb-6">
+          <DeckSelector
+            decks={decks}
+            activeDeck={activeDeck}
+            onSelectDeck={handleDeckChange}
+            onCreateDeck={() => setShowCreateModal(true)}
+            onImportDeck={() => setShowImportModal(true)}
+            onDeckDeleted={refreshDecks}
+          />
+
+          <motion.button
+            onClick={() => setShowAddWordModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">Add Word</span>
+          </motion.button>
+        </div>
+
         <StudyStats stats={stats} />
 
         <StudyModeSelector
@@ -279,6 +334,29 @@ const Index = () => {
           Reset Progress
         </motion.button>
       </main>
+
+      {/* Modals */}
+      <ImportDeckModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onImported={() => {
+          refreshDecks();
+          setShowImportModal(false);
+        }}
+      />
+
+      <CreateDeckModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onCreated={handleDeckCreated}
+      />
+
+      <AddWordModal
+        isOpen={showAddWordModal}
+        onClose={() => setShowAddWordModal(false)}
+        deck={activeDeck}
+        onWordAdded={handleWordAdded}
+      />
     </div>
   );
 };
