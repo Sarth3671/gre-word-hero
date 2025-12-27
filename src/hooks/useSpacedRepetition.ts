@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { vocabularyDeck, VocabularyWord } from "@/data/vocabulary";
+import { VocabularyWord } from "@/data/vocabulary";
 import {
   CardState,
   Quality,
@@ -7,20 +7,36 @@ import {
   calculateNextReview,
   isDueForReview,
 } from "@/lib/sm2";
+import { Deck, getActiveDeck, getActiveDeckId, setActiveDeckId, getAllDecks } from "@/lib/deckManager";
 
-const STORAGE_KEY = "gre-vocab-card-states";
+const STORAGE_KEY_PREFIX = "gre-vocab-card-states-";
 
 export interface CardWithState extends VocabularyWord {
   state: CardState;
 }
 
+function getStorageKey(deckId: string): string {
+  return `${STORAGE_KEY_PREFIX}${deckId}`;
+}
+
 export function useSpacedRepetition() {
   const [cardStates, setCardStates] = useState<Map<number, CardState>>(new Map());
   const [isLoaded, setIsLoaded] = useState(false);
+  const [activeDeck, setActiveDeck] = useState<Deck | null>(null);
+  const [decks, setDecks] = useState<Deck[]>([]);
 
-  // Load from localStorage on mount
-  useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
+  // Load decks and active deck
+  const refreshDecks = useCallback(() => {
+    const allDecks = getAllDecks();
+    setDecks(allDecks);
+    const active = getActiveDeck();
+    setActiveDeck(active);
+    return active;
+  }, []);
+
+  // Load card states for the active deck
+  const loadCardStates = useCallback((deckId: string) => {
+    const stored = localStorage.getItem(getStorageKey(deckId));
     if (stored) {
       try {
         const parsed = JSON.parse(stored) as CardState[];
@@ -31,18 +47,36 @@ export function useSpacedRepetition() {
         setCardStates(stateMap);
       } catch (e) {
         console.error("Failed to parse stored card states:", e);
+        setCardStates(new Map());
       }
+    } else {
+      setCardStates(new Map());
     }
-    setIsLoaded(true);
   }, []);
+
+  // Initial load
+  useEffect(() => {
+    const active = refreshDecks();
+    loadCardStates(active.id);
+    setIsLoaded(true);
+  }, [refreshDecks, loadCardStates]);
 
   // Save to localStorage whenever states change
   useEffect(() => {
-    if (isLoaded) {
+    if (isLoaded && activeDeck) {
       const statesArray = Array.from(cardStates.values());
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(statesArray));
+      localStorage.setItem(getStorageKey(activeDeck.id), JSON.stringify(statesArray));
     }
-  }, [cardStates, isLoaded]);
+  }, [cardStates, isLoaded, activeDeck]);
+
+  const switchDeck = useCallback((deckId: string) => {
+    setActiveDeckId(deckId);
+    const allDecks = getAllDecks();
+    const newActive = allDecks.find(d => d.id === deckId) || allDecks[0];
+    setDecks(allDecks);
+    setActiveDeck(newActive);
+    loadCardStates(deckId);
+  }, [loadCardStates]);
 
   const getCardState = useCallback(
     (wordId: number): CardState => {
@@ -62,25 +96,28 @@ export function useSpacedRepetition() {
   }, []);
 
   const getDueCards = useCallback((): CardWithState[] => {
-    return vocabularyDeck
+    if (!activeDeck) return [];
+    return activeDeck.words
       .map((word) => ({
         ...word,
         state: getCardState(word.id),
       }))
       .filter((card) => isDueForReview(card.state));
-  }, [getCardState]);
+  }, [activeDeck, getCardState]);
 
   const getNewCards = useCallback((): CardWithState[] => {
-    return vocabularyDeck
+    if (!activeDeck) return [];
+    return activeDeck.words
       .map((word) => ({
         ...word,
         state: getCardState(word.id),
       }))
       .filter((card) => card.state.repetitions === 0 && card.state.interval === 0);
-  }, [getCardState]);
+  }, [activeDeck, getCardState]);
 
   const getLearningCards = useCallback((): CardWithState[] => {
-    return vocabularyDeck
+    if (!activeDeck) return [];
+    return activeDeck.words
       .map((word) => ({
         ...word,
         state: getCardState(word.id),
@@ -91,30 +128,37 @@ export function useSpacedRepetition() {
           card.state.interval > 0 &&
           card.state.interval < 21
       );
-  }, [getCardState]);
+  }, [activeDeck, getCardState]);
 
   const getMasteredCards = useCallback((): CardWithState[] => {
-    return vocabularyDeck
+    if (!activeDeck) return [];
+    return activeDeck.words
       .map((word) => ({
         ...word,
         state: getCardState(word.id),
       }))
       .filter((card) => card.state.interval >= 21);
-  }, [getCardState]);
+  }, [activeDeck, getCardState]);
 
   const getAllCardsWithState = useCallback((): CardWithState[] => {
-    return vocabularyDeck.map((word) => ({
+    if (!activeDeck) return [];
+    return activeDeck.words.map((word) => ({
       ...word,
       state: getCardState(word.id),
     }));
-  }, [getCardState]);
+  }, [activeDeck, getCardState]);
 
   const resetProgress = useCallback(() => {
+    if (!activeDeck) return;
     setCardStates(new Map());
-    localStorage.removeItem(STORAGE_KEY);
-  }, []);
+    localStorage.removeItem(getStorageKey(activeDeck.id));
+  }, [activeDeck]);
 
   const getStats = useCallback(() => {
+    if (!activeDeck) {
+      return { total: 0, due: 0, new: 0, learning: 0, mastered: 0 };
+    }
+    
     const allCards = getAllCardsWithState();
     const dueCards = getDueCards();
     const newCards = getNewCards();
@@ -128,10 +172,14 @@ export function useSpacedRepetition() {
       learning: learningCards.length,
       mastered: masteredCards.length,
     };
-  }, [getAllCardsWithState, getDueCards, getNewCards, getLearningCards, getMasteredCards]);
+  }, [activeDeck, getAllCardsWithState, getDueCards, getNewCards, getLearningCards, getMasteredCards]);
 
   return {
     isLoaded,
+    activeDeck,
+    decks,
+    switchDeck,
+    refreshDecks,
     getCardState,
     reviewCard,
     getDueCards,
