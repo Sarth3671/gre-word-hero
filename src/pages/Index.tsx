@@ -15,6 +15,8 @@ import DeckSelector from "@/components/DeckSelector";
 import ImportDeckModal from "@/components/ImportDeckModal";
 import CreateDeckModal from "@/components/CreateDeckModal";
 import AddWordModal from "@/components/AddWordModal";
+import StudyTypeToggle, { StudyType } from "@/components/StudyTypeToggle";
+import QuizOptions from "@/components/QuizOptions";
 
 const Index = () => {
   const {
@@ -33,6 +35,7 @@ const Index = () => {
   } = useSpacedRepetition();
 
   const [studyMode, setStudyMode] = useState<StudyMode>("due");
+  const [studyType, setStudyType] = useState<StudyType>("flashcard");
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [sessionReviewed, setSessionReviewed] = useState(0);
@@ -59,6 +62,12 @@ const Index = () => {
         return getDueCards();
     }
   }, [isLoaded, studyMode, getDueCards, getNewCards, getLearningCards, getAllCardsWithState]);
+
+  // Get all words for quiz distractors
+  const allWords = useMemo(() => {
+    if (!isLoaded) return [];
+    return getAllCardsWithState();
+  }, [isLoaded, getAllCardsWithState]);
 
   const stats = useMemo(() => {
     if (!isLoaded) return { total: 0, due: 0, new: 0, learning: 0, mastered: 0 };
@@ -163,11 +172,12 @@ const Index = () => {
     refreshDecks();
   }, [refreshDecks]);
 
-  // Keyboard navigation
+  // Keyboard navigation (only for flashcard mode)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!currentCard) return;
       if (showImportModal || showCreateModal || showAddWordModal) return;
+      if (studyType === "quiz") return; // Quiz handles its own keyboard
 
       switch (e.key) {
         case " ":
@@ -201,7 +211,7 @@ const Index = () => {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentCard, isFlipped, handleFlip, handlePrevious, handleNext, handleRate, showImportModal, showCreateModal, showAddWordModal]);
+  }, [currentCard, isFlipped, handleFlip, handlePrevious, handleNext, handleRate, showImportModal, showCreateModal, showAddWordModal, studyType]);
 
   if (!isLoaded || !activeDeck) {
     return (
@@ -239,6 +249,11 @@ const Index = () => {
         </div>
 
         <StudyStats stats={stats} />
+
+        {/* Study Type Toggle */}
+        <div className="mb-4">
+          <StudyTypeToggle type={studyType} onChange={setStudyType} />
+        </div>
 
         <StudyModeSelector
           mode={studyMode}
@@ -280,13 +295,13 @@ const Index = () => {
 
               <AnimatePresence mode="wait">
                 <motion.div
-                  key={currentCard?.id}
+                  key={`${currentCard?.id}-${studyType}`}
                   initial={{ opacity: 0, x: 50 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -50 }}
                   transition={{ duration: 0.2 }}
                 >
-                  {currentCard && (
+                  {currentCard && studyType === "flashcard" && (
                     <>
                       <Flashcard
                         word={currentCard}
@@ -296,10 +311,19 @@ const Index = () => {
                       <CardInfo state={currentCard.state} />
                     </>
                   )}
+
+                  {currentCard && studyType === "quiz" && (
+                    <QuizOptions
+                      currentWord={currentCard}
+                      allWords={allWords}
+                      cardState={currentCard.state}
+                      onAnswer={handleRate}
+                    />
+                  )}
                 </motion.div>
               </AnimatePresence>
 
-              {currentCard && (
+              {currentCard && studyType === "flashcard" && (
                 <QualityButtons
                   cardState={currentCard.state}
                   onRate={handleRate}
@@ -307,19 +331,23 @@ const Index = () => {
                 />
               )}
 
-              <NavigationButtons
-                onPrevious={handlePrevious}
-                onNext={handleNext}
-                onShuffle={handleShuffle}
-                canGoPrevious={currentIndex > 0}
-                canGoNext={currentIndex < cards.length - 1}
-              />
+              {studyType === "flashcard" && (
+                <>
+                  <NavigationButtons
+                    onPrevious={handlePrevious}
+                    onNext={handleNext}
+                    onShuffle={handleShuffle}
+                    canGoPrevious={currentIndex > 0}
+                    canGoNext={currentIndex < cards.length - 1}
+                  />
 
-              <p className="text-center text-xs text-muted-foreground mt-6">
-                Press <kbd className="px-1.5 py-0.5 bg-secondary rounded font-mono">Space</kbd> to flip •
-                <kbd className="px-1.5 py-0.5 bg-secondary rounded font-mono ml-1">←</kbd>{" "}
-                <kbd className="px-1.5 py-0.5 bg-secondary rounded font-mono">→</kbd> to navigate
-              </p>
+                  <p className="text-center text-xs text-muted-foreground mt-6">
+                    Press <kbd className="px-1.5 py-0.5 bg-secondary rounded font-mono">Space</kbd> to flip •
+                    <kbd className="px-1.5 py-0.5 bg-secondary rounded font-mono ml-1">←</kbd>{" "}
+                    <kbd className="px-1.5 py-0.5 bg-secondary rounded font-mono">→</kbd> to navigate
+                  </p>
+                </>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
