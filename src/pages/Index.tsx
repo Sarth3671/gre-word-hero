@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { RotateCcw, Plus } from "lucide-react";
 import { Quality } from "@/lib/sm2";
 import { useSpacedRepetition, CardWithState } from "@/hooks/useSpacedRepetition";
+import { useTheme } from "@/hooks/useTheme";
+import { useStreak } from "@/hooks/useStreak";
 import Header from "@/components/Header";
 import Flashcard from "@/components/Flashcard";
 import QualityButtons from "@/components/QualityButtons";
@@ -19,6 +21,9 @@ import StudyTypeToggle, { StudyType } from "@/components/StudyTypeToggle";
 import QuizOptions from "@/components/QuizOptions";
 
 const Index = () => {
+  const { isDark, toggleTheme } = useTheme();
+  const { currentStreak, longestStreak, hasStudiedToday, recordStudySession } = useStreak();
+  
   const {
     isLoaded,
     activeDeck,
@@ -111,6 +116,9 @@ const Index = () => {
       if (!currentCard) return;
       reviewCard(currentCard.id, quality);
       setSessionReviewed((prev) => prev + 1);
+      
+      // Record study session for streak
+      recordStudySession();
 
       // Move to next card or reset
       if (currentIndex < cards.length - 1) {
@@ -122,7 +130,7 @@ const Index = () => {
         }, 200);
       }
     },
-    [currentCard, reviewCard, currentIndex, cards.length, goToNextCard]
+    [currentCard, reviewCard, currentIndex, cards.length, goToNextCard, recordStudySession]
   );
 
   const handlePrevious = useCallback(() => {
@@ -228,9 +236,21 @@ const Index = () => {
         <div className="floating-orb floating-orb-1" />
         <div className="floating-orb floating-orb-2" />
         <div className="floating-orb floating-orb-3" />
+        <div className="floating-orb floating-orb-4" />
+        <div className="particle" />
+        <div className="particle" />
+        <div className="particle" />
+        <div className="particle" />
+        <div className="particle" />
       </div>
       
-      <Header />
+      <Header 
+        isDark={isDark}
+        onThemeToggle={toggleTheme}
+        currentStreak={currentStreak}
+        longestStreak={longestStreak}
+        hasStudiedToday={hasStudiedToday()}
+      />
 
       <main className="flex-1 flex flex-col items-center px-4 pb-12">
         {/* Deck Selector */}

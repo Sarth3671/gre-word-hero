@@ -116,16 +116,19 @@ const QuizOptions = ({ currentWord, allWords, cardState, onAnswer }: QuizOptions
           let bgClass = "bg-card hover:bg-secondary/50";
           let borderClass = "border-transparent";
           let iconElement = null;
+          let animationClass = "";
 
           if (showResult) {
             if (isCorrectOption) {
               bgClass = "bg-success/10";
               borderClass = "border-success";
               iconElement = <Check className="w-5 h-5 text-success" />;
+              animationClass = "animate-success-ripple";
             } else if (isSelected && !isCorrectOption) {
               bgClass = "bg-destructive/10";
               borderClass = "border-destructive";
               iconElement = <X className="w-5 h-5 text-destructive" />;
+              animationClass = "animate-error-shake";
             }
           }
 
@@ -136,25 +139,32 @@ const QuizOptions = ({ currentWord, allWords, cardState, onAnswer }: QuizOptions
               disabled={showResult}
               className={`
                 w-full text-left p-4 rounded-lg border-2 transition-all duration-200
-                ${bgClass} ${borderClass}
+                ${bgClass} ${borderClass} ${animationClass}
                 ${!showResult ? "cursor-pointer" : "cursor-default"}
                 card-shadow
               `}
-              whileHover={!showResult ? { scale: 1.01 } : {}}
-              whileTap={!showResult ? { scale: 0.99 } : {}}
+              whileHover={!showResult ? { scale: 1.01, x: 4 } : {}}
+              whileTap={!showResult ? { scale: 0.98 } : {}}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3, delay: index * 0.1 }}
             >
               <div className="flex items-start gap-3">
-                <span className="flex-shrink-0 w-7 h-7 rounded-full bg-secondary flex items-center justify-center text-sm font-medium text-foreground">
+                <motion.span 
+                  className="flex-shrink-0 w-7 h-7 rounded-full bg-secondary flex items-center justify-center text-sm font-medium text-foreground"
+                  whileHover={{ scale: 1.1, rotate: 5 }}
+                >
                   {index + 1}
-                </span>
+                </motion.span>
                 <p className="flex-1 text-foreground leading-relaxed">
                   {option.definition}
                 </p>
                 <AnimatePresence>
                   {showResult && iconElement && (
                     <motion.span
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
+                      initial={{ scale: 0, rotate: -180 }}
+                      animate={{ scale: 1, rotate: 0 }}
+                      transition={{ type: "spring", stiffness: 500, damping: 25 }}
                       className="flex-shrink-0"
                     >
                       {iconElement}
