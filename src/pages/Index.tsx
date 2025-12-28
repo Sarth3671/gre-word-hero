@@ -222,7 +222,14 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen flex flex-col relative">
+      {/* Animated Background */}
+      <div className="animated-bg">
+        <div className="floating-orb floating-orb-1" />
+        <div className="floating-orb floating-orb-2" />
+        <div className="floating-orb floating-orb-3" />
+      </div>
+      
       <Header />
 
       <main className="flex-1 flex flex-col items-center px-4 pb-12">
