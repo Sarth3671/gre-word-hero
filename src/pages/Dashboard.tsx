@@ -79,9 +79,9 @@ const Dashboard = () => {
 
   // Calculate difficulty distribution
   const difficultyData = useMemo(() => {
-    const easy = cards.filter(c => c.state.easeFactor >= 2.5).length;
-    const medium = cards.filter(c => c.state.easeFactor >= 2.0 && c.state.easeFactor < 2.5).length;
-    const hard = cards.filter(c => c.state.easeFactor < 2.0).length;
+    const easy = cards.filter(c => c.state.easinessFactor >= 2.5).length;
+    const medium = cards.filter(c => c.state.easinessFactor >= 2.0 && c.state.easinessFactor < 2.5).length;
+    const hard = cards.filter(c => c.state.easinessFactor < 2.0).length;
     
     return [
       { difficulty: "Easy", count: easy, fill: "hsl(var(--success))" },
@@ -109,7 +109,7 @@ const Dashboard = () => {
   const totalDecks = decks.length;
   const totalWords = decks.reduce((sum, deck) => sum + deck.words.length, 0);
   const averageEase = cards.length > 0 
-    ? (cards.reduce((sum, c) => sum + c.state.easeFactor, 0) / cards.length).toFixed(2)
+    ? (cards.reduce((sum, c) => sum + c.state.easinessFactor, 0) / cards.length).toFixed(2)
     : "2.50";
 
   return (

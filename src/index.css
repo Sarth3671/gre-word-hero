@@ -156,6 +156,16 @@
   .btn-shadow {
     box-shadow: var(--shadow-button);
   }
+
+  .glass-card {
+    background: hsl(var(--card) / 0.8);
+    backdrop-filter: blur(20px);
+    box-shadow: var(--shadow-card);
+  }
+
+  .dark .glass-card {
+    background: hsl(var(--card) / 0.6);
+  }
 }
 
 /* Animated background */
